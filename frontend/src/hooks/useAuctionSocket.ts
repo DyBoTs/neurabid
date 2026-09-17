@@ -56,6 +56,11 @@ export function useAuctionSocket(auctionId: string): UseAuctionSocketResult {
   }
 
   useEffect(() => {
+    if (!WS_URL) {
+      setConnectionState('disconnected');
+      return;
+    }
+
     let socket: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout>;
     let cancelled = false;

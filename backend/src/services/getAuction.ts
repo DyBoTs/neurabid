@@ -78,3 +78,46 @@ export async function createAuction(input: CreateAuctionInput): Promise<AuctionD
   );
   return toDTO(rows[0]);
 }
+
+export interface UpdateAuctionInput {
+  title?: string;
+  description?: string | null;
+  durationMinutes?: number;
+}
+
+/**
+ * Deliberately cannot touch startingPrice, currentPrice, or minIncrement —
+ * those are load-bearing for placeBid.ts's correctness guarantees once any
+ * bid exists, so letting an admin edit them here would reopen exactly the
+ * kind of invariant this project exists to protect. Editing what an
+ * auction *is* (title/description) and how long it runs is safe; editing
+ * what winning it costs is not, so it isn't exposed.
+ */
+export async function updateAuction(id: string, input: UpdateAuctionInput): Promise<AuctionDTO | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+
+  if (input.title !== undefined) {
+    values.push(input.title);
+    sets.push(`title = $${values.length}`);
+  }
+  if (input.description !== undefined) {
+    values.push(input.description);
+    sets.push(`description = $${values.length}`);
+  }
+  if (input.durationMinutes !== undefined) {
+    values.push(input.durationMinutes);
+    sets.push(`ends_at = now() + make_interval(mins => $${values.length}::numeric)`);
+  }
+
+  if (sets.length === 0) {
+    return getAuctionById(id);
+  }
+
+  values.push(id);
+  const { rows } = await pool.query<AuctionRow>(
+    `UPDATE auctions SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
+    values,
+  );
+  return rows[0] ? toDTO(rows[0]) : null;
+}

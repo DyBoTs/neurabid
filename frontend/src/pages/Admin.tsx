@@ -5,6 +5,8 @@ import { Table } from '../components/ui/Table';
 import tableStyles from '../components/ui/Table.module.css';
 import { useAdminBidStream } from '../hooks/useAdminBidStream';
 import { DemoControls } from '../components/DemoControls';
+import { AuctionManagement } from '../components/AuctionManagement';
+import { useAuth } from '../hooks/useAuth';
 import { getAdminDashboard } from '../api/admin';
 import type { AdminDashboard } from '../api/types';
 import styles from './Admin.module.css';
@@ -47,6 +49,7 @@ function HealthBadge({ status }: { status: 'ok' | 'error' }) {
  * everything else.
  */
 export function AdminPage() {
+  const { user } = useAuth();
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +100,13 @@ export function AdminPage() {
           <span className={styles.updatedAt}>Updated {lastUpdated.toLocaleTimeString()}</span>
         )}
       </div>
+
+      {user?.role === 'admin' && (
+        <section className={styles.section}>
+          <div className={styles.sectionTitle}>Auction Management</div>
+          <AuctionManagement />
+        </section>
+      )}
 
       <section className={styles.section}>
         <div className={styles.sectionTitle}>Demo Controls</div>

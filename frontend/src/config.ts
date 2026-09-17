@@ -8,4 +8,5 @@
  * and for reaching the dev server from another machine on the LAN).
  */
 export const WS_URL =
-  (import.meta.env.VITE_WS_URL as string | undefined) ?? `ws://${window.location.hostname}:4000`;
+  (import.meta.env.VITE_WS_URL as string | undefined) ??
+  (import.meta.env.DEV ? `ws://${window.location.hostname}:4000` : '');

@@ -1,4 +1,5 @@
 import { pool } from '../db.js';
+import { seedAdminFromEnv } from '../services/seedAdmin.js';
 
 async function main() {
   console.log('Seeding demo data (this replaces any existing rows in users/auctions/bids)...');
@@ -38,6 +39,13 @@ async function main() {
     'Seeded 3 users, 4 auctions (active, ending soon, already ended, not started yet).',
   );
   console.log({ alice, bob, novel, synth, boardGames });
+
+  // The TRUNCATE above wipes any admin account the server seeded at its
+  // own startup (see services/seedAdmin.ts) — reseed it here too, so
+  // `npm run seed` alone always leaves a working admin login without
+  // requiring a backend restart afterward.
+  await seedAdminFromEnv();
+
   await pool.end();
 }
 

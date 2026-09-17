@@ -48,3 +48,34 @@ export async function sweepOnce(): Promise<EndedAuctionRow[]> {
 
   return rows;
 }
+
+/**
+ * The admin "Stop Auction" action (see routes/auctions.ts). Shares the
+ * sweep's exact ending logic — same status transition, same broadcast — so
+ * a manually-stopped auction is indistinguishable from one that ended on
+ * schedule to anyone watching it. Setting ends_at = now() alongside status
+ * matters: placeBid.ts's own end-check reads ends_at, not just status, so
+ * this closes both doors in the same instant, before this function even
+ * returns.
+ */
+export async function endAuctionNow(auctionId: string): Promise<EndedAuctionRow | null> {
+  const { rows } = await pool.query<EndedAuctionRow>(
+    `UPDATE auctions
+     SET status = 'ended', ends_at = now()
+     WHERE id = $1 AND status = 'active'
+     RETURNING id, current_price, current_bid_id`,
+    [auctionId],
+  );
+
+  const row = rows[0];
+  if (!row) return null;
+
+  broadcast(row.id, {
+    type: 'auction_ended',
+    auctionId: row.id,
+    winningBidId: row.current_bid_id,
+    finalPrice: Number(row.current_price),
+  });
+
+  return row;
+}

@@ -8,7 +8,7 @@ import { ApiError } from '../api/client';
 import styles from './CreateAuction.module.css';
 
 export function CreateAuctionPage() {
-  const { user } = useAuth();
+  const { user, sessionToken } = useAuth();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -18,22 +18,29 @@ export function CreateAuctionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!user) {
-    return <p>Log in to create an auction.</p>;
+  // The frontend check below is a UX nicety only — the real boundary is
+  // requireAdmin on the server (backend/src/middleware/requireAdmin.ts),
+  // which rejects this same request regardless of what this page shows.
+  if (!user || user.role !== 'admin' || !sessionToken) {
+    return <p>Only admin accounts can create auctions. Log in as an admin to continue.</p>;
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!sessionToken) return;
     setSubmitting(true);
     setError(null);
     try {
-      const auction = await createAuction({
-        title,
-        description: description || undefined,
-        startingPrice: Number(startingPrice),
-        minIncrement: Number(minIncrement),
-        durationMinutes: Number(durationMinutes),
-      });
+      const auction = await createAuction(
+        {
+          title,
+          description: description || undefined,
+          startingPrice: Number(startingPrice),
+          minIncrement: Number(minIncrement),
+          durationMinutes: Number(durationMinutes),
+        },
+        sessionToken,
+      );
       navigate(`/auctions/${auction.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create the auction.');

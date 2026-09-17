@@ -12,9 +12,12 @@ export interface Auction {
   currentBidId: string | null;
 }
 
+export type Role = 'user' | 'admin';
+
 export interface User {
   id: string;
   username: string;
+  role: Role;
 }
 
 export interface PlacedBid {

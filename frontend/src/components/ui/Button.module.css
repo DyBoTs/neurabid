@@ -41,5 +41,9 @@
 
 .destructive {
   background: var(--color-negative);
-  color: var(--color-text);
+  color: var(--color-text-on-accent);
+}
+
+.destructive:not(:disabled):hover {
+  background: var(--color-negative-hover);
 }

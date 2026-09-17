@@ -1,13 +1,18 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
-import { loginOrRegister } from '../api/users';
+import { login as loginRequest, logout as logoutRequest } from '../api/auth';
 import type { User } from '../api/types';
 
-const STORAGE_KEY = 'neurabid.user';
+const STORAGE_KEY = 'neurabid.auth';
 
-function readStoredUser(): User | null {
+interface StoredAuth {
+  user: User;
+  sessionToken: string;
+}
+
+function readStoredAuth(): StoredAuth | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
+    return raw ? (JSON.parse(raw) as StoredAuth) : null;
   } catch {
     return null;
   }
@@ -15,39 +20,52 @@ function readStoredUser(): User | null {
 
 interface AuthContextValue {
   user: User | null;
-  login: (username: string) => Promise<User>;
+  /** Only ever sent as the X-Session-Token header — never the password itself (see api/auth.ts). */
+  sessionToken: string | null;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * NeuraBid's "auth" is intentionally minimal (see docs/02-local-setup.md):
- * pick a username, no password. The user's own id doubles as the
- * credential sent as X-User-Id on bid requests — there's no server
- * session, so "logged in" just means "we remember this id locally."
- *
- * This lives in a single Context provider (mounted once in App.tsx), not
- * as independent useState in every component that calls useAuth() — every
- * consumer must see the same login, immediately, or the nav bar and the
- * page that just logged in disagree with each other.
+ * Real password authentication (see backend/src/services/auth.ts): the
+ * server verifies the password and hands back a session token, which is
+ * what every admin-gated request actually presents — this hook just holds
+ * onto it. The password itself is never stored here, never round-trips
+ * back from the server, and never touches localStorage; only the opaque
+ * session token does, which is exactly what a browser would otherwise keep
+ * in a cookie for the same purpose.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => readStoredUser());
+  const [auth, setAuth] = useState<StoredAuth | null>(() => readStoredAuth());
 
-  const login = useCallback(async (username: string) => {
-    const loggedInUser = await loginOrRegister(username);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedInUser));
-    setUser(loggedInUser);
-    return loggedInUser;
+  const login = useCallback(async (username: string, password: string) => {
+    const result = await loginRequest(username, password);
+    const next: StoredAuth = { user: result.user, sessionToken: result.sessionToken };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setAuth(next);
+    return result.user;
   }, []);
 
   const logout = useCallback(() => {
+    const token = auth?.sessionToken;
     localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
-  }, []);
+    setAuth(null);
+    if (token) {
+      // Best-effort — the frontend has already forgotten the session either
+      // way, so a failed request here (e.g. offline) doesn't need handling.
+      logoutRequest(token).catch(() => {});
+    }
+  }, [auth]);
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ user: auth?.user ?? null, sessionToken: auth?.sessionToken ?? null, login, logout }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

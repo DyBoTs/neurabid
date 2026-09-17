@@ -17,6 +17,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<LoginPage variant="admin" />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/auctions/:id" element={<LiveAuctionPage />} />
             <Route path="/create" element={<CreateAuctionPage />} />

@@ -7,10 +7,12 @@ import { pool } from './db.js';
 import { ensureRedisConnected, redis } from './redis.js';
 import { HttpError } from './httpError.js';
 import { usersRouter } from './routes/users.js';
+import { authRouter } from './routes/auth.js';
 import { auctionsRouter } from './routes/auctions.js';
 import { adminRouter } from './routes/admin.js';
 import { attachWebSocketServer } from './ws/wsServer.js';
 import { startAuctionEndSweep } from './services/auctionEndSweep.js';
+import { seedAdminFromEnv } from './services/seedAdmin.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +24,7 @@ app.use(express.json());
 // /debug/realtime-test.html.
 app.use('/debug', express.static(path.join(__dirname, '..', 'public')));
 
-app.get('/health', async (_req, res) => {
+app.get(['/health', '/api/health'], async (_req, res) => {
   const checks: Record<string, 'ok' | 'error'> = { db: 'error', redis: 'error' };
   let dbError: string | undefined;
   let redisError: string | undefined;
@@ -52,6 +54,7 @@ app.get('/health', async (_req, res) => {
 });
 
 app.use('/api/users', usersRouter);
+app.use('/api/auth', authRouter);
 app.use('/api/auctions', auctionsRouter);
 app.use('/api/admin', adminRouter);
 
@@ -67,10 +70,15 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-if (process.env.VITEST !== 'true') {
+if (process.env.VITEST !== 'true' && process.env.VERCEL !== '1') {
+  seedAdminFromEnv().catch((err: unknown) => {
+    console.error('Could not seed dev admin account:', err);
+  });
   const httpServer = app.listen(config.port, () => {
     console.log(`neurabid backend listening on http://localhost:${config.port}`);
   });
   attachWebSocketServer(httpServer);
   startAuctionEndSweep();
 }
+
+export default app;

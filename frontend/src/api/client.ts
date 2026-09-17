@@ -8,9 +8,11 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH';
   body?: unknown;
   userId?: string;
+  /** Sent as X-Session-Token — the only thing admin-gated endpoints actually trust (see backend/src/middleware/requireAdmin.ts). Never the same value as a password. */
+  sessionToken?: string;
 }
 
 /**
@@ -23,12 +25,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.userId) headers['X-User-Id'] = options.userId;
+  if (options.sessionToken) headers['X-Session-Token'] = options.sessionToken;
 
   const res = await fetch(path, {
     method: options.method ?? 'GET',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
+
+  if (res.status === 204) return undefined as T;
 
   const data = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
 

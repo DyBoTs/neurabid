@@ -3,8 +3,10 @@ import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
 import { isUuid } from '../validation.js';
 import { pool } from '../db.js';
-import { createAuction, getAuctionById, listAuctions } from '../services/getAuction.js';
+import { createAuction, getAuctionById, listAuctions, updateAuction } from '../services/getAuction.js';
 import { placeBidAndAnnounce } from '../services/placeBidAndAnnounce.js';
+import { endAuctionNow } from '../services/auctionEndSweep.js';
+import { requireAdmin } from '../middleware/requireAdmin.js';
 
 export const auctionsRouter = Router();
 
@@ -71,10 +73,14 @@ auctionsRouter.get(
 /**
  * Creates a new auction, starting immediately. Server-side validation only
  * — never trust the client to have checked these (same principle as bid
- * validation in placeBid.ts).
+ * validation in placeBid.ts). requireAdmin is the actual security boundary
+ * here — the "Create Auction" nav link and page being hidden from regular
+ * users in the frontend is a UX nicety, not the enforcement (see
+ * middleware/requireAdmin.ts).
  */
 auctionsRouter.post(
   '/',
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
     if (title.length < 3 || title.length > 200) {
@@ -142,5 +148,72 @@ auctionsRouter.post(
     const result = await placeBidAndAnnounce(auctionId, userId, amount);
 
     res.status(201).json(result);
+  }),
+);
+
+/**
+ * Edits title/description/remaining duration only — never the price fields
+ * (see UpdateAuctionInput's comment in services/getAuction.ts for why).
+ * requireAdmin, not a frontend check, is what actually stops a regular
+ * user from calling this directly.
+ */
+auctionsRouter.patch(
+  '/:id',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isUuid(id)) throw new HttpError(400, 'Invalid auction id');
+
+    const input: { title?: string; description?: string | null; durationMinutes?: number } = {};
+
+    if (req.body?.title !== undefined) {
+      const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+      if (title.length < 3 || title.length > 200) {
+        throw new HttpError(400, 'Title must be 3-200 characters');
+      }
+      input.title = title;
+    }
+
+    if (req.body?.description !== undefined) {
+      input.description =
+        typeof req.body.description === 'string' && req.body.description.trim()
+          ? req.body.description.trim()
+          : null;
+    }
+
+    if (req.body?.durationMinutes !== undefined) {
+      const durationMinutes = Number(req.body.durationMinutes);
+      if (!Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 10_080) {
+        throw new HttpError(400, 'Duration must be between 1 minute and 7 days');
+      }
+      input.durationMinutes = durationMinutes;
+    }
+
+    const updated = await updateAuction(id, input);
+    if (!updated) throw new HttpError(404, 'Auction not found');
+
+    res.json(updated);
+  }),
+);
+
+/**
+ * Stops an active auction immediately. Shares endAuctionNow() with the
+ * background sweep (services/auctionEndSweep.ts) so a manual stop behaves
+ * identically to a natural end — same broadcast, same final state.
+ */
+auctionsRouter.post(
+  '/:id/end',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isUuid(id)) throw new HttpError(400, 'Invalid auction id');
+
+    const ended = await endAuctionNow(id);
+    if (!ended) {
+      throw new HttpError(409, 'Auction is not currently active (already ended, or does not exist)');
+    }
+
+    const auction = await getAuctionById(id);
+    res.json(auction);
   }),
 );

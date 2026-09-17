@@ -1,10 +1,12 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { AboutModal } from './AboutModal';
 import styles from './Layout.module.css';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
     <div className={styles.shell}>
@@ -16,23 +18,28 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/marketplace" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
             Marketplace
           </NavLink>
-          <NavLink to="/create" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
-            Create Auction
-          </NavLink>
+          {/* Creating an auction is an admin-only action (see
+              backend/src/middleware/requireAdmin.ts, the actual security
+              boundary) — hiding the link for everyone else is a UX
+              nicety, not the enforcement. */}
+          {user?.role === 'admin' && (
+            <NavLink to="/create" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
+              Create Auction
+            </NavLink>
+          )}
           {user && (
             <>
               <NavLink to="/my-bids" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
                 My Bids
               </NavLink>
-              {/* "Authorized" here just means "logged in" — this app has no
-                  role system (see docs/02-local-setup.md's auth note). This
-                  only keeps the link off the nav for a first-time visitor,
-                  it isn't an access-control boundary. */}
               <NavLink to="/admin" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
                 Admin
               </NavLink>
             </>
           )}
+          <button type="button" className={styles.link} onClick={() => setAboutOpen(true)}>
+            About
+          </button>
           {user ? (
             <div className={styles.account}>
               <span className={styles.user}>{user.username}</span>
@@ -41,13 +48,19 @@ export function Layout({ children }: { children: ReactNode }) {
               </button>
             </div>
           ) : (
-            <NavLink to="/login" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
-              Log in
-            </NavLink>
+            <div className={styles.account}>
+              <NavLink to="/login" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
+                Log in
+              </NavLink>
+              <NavLink to="/admin/login" className={styles.adminLoginLink}>
+                Admin Login
+              </NavLink>
+            </div>
           )}
         </div>
       </nav>
       <main className={styles.main}>{children}</main>
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }

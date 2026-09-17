@@ -24,4 +24,9 @@ export const config = {
     database: required('PGDATABASE'),
   },
   redisUrl: required('REDIS_URL'),
+  // Optional — see .env.example. Used only to seed a dev admin account on
+  // startup (services/seedAdmin.ts); never read anywhere else, and never
+  // sent to the frontend.
+  adminUsername: process.env.ADMIN_USERNAME,
+  adminPassword: process.env.ADMIN_PASSWORD,
 };

@@ -26,6 +26,11 @@ export function useAdminBidStream(): { connectionState: ConnectionState; entries
   const [entries, setEntries] = useState<StreamEntry[]>([]);
 
   useEffect(() => {
+    if (!WS_URL) {
+      setConnectionState('disconnected');
+      return;
+    }
+
     let socket: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout>;
     let cancelled = false;
