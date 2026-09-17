@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { asyncHandler } from '../asyncHandler.js';
+import { HttpError } from '../httpError.js';
 import { pool } from '../db.js';
 import { ensureRedisConnected, redis } from '../redis.js';
 import { getMetricsSnapshot } from '../metrics.js';
 import { verifyCorrectness } from '../services/verifyCorrectness.js';
 import { connectionCount } from '../ws/broadcaster.js';
+import { getDemoAuction, resetDemoAuction, simulateConcurrentBids } from '../services/demo.js';
 
 export const adminRouter = Router();
 
@@ -96,5 +98,41 @@ adminRouter.get(
         checkedAt: correctness.checkedAt,
       },
     });
+  }),
+);
+
+/**
+ * Demo Mode endpoints (docs/09-demo-runbook.md). These exist so a live
+ * presentation never depends on a terminal being visible or a command
+ * being typed correctly under pressure — every action here is real
+ * (real DELETE/UPDATE/INSERT, real placeBid() calls), just triggered on
+ * demand instead of by an actual bidder's click.
+ */
+
+adminRouter.get(
+  '/demo/auction',
+  asyncHandler(async (_req, res) => {
+    const auction = await getDemoAuction();
+    res.json({ auction });
+  }),
+);
+
+adminRouter.post(
+  '/demo/reset',
+  asyncHandler(async (_req, res) => {
+    const auction = await resetDemoAuction();
+    res.json({ auction });
+  }),
+);
+
+adminRouter.post(
+  '/demo/simulate',
+  asyncHandler(async (req, res) => {
+    const count = Number(req.body?.count);
+    if (!Number.isInteger(count) || count < 1 || count > 200) {
+      throw new HttpError(400, 'count must be an integer between 1 and 200');
+    }
+    const result = await simulateConcurrentBids(count);
+    res.json(result);
   }),
 );

@@ -69,6 +69,13 @@ export interface AdminDashboard {
   };
 }
 
+export interface SimulationResult {
+  requested: number;
+  accepted: number;
+  rejected: number;
+  results: { userId: string; status: 'accepted' | 'rejected'; amount: number; message?: string }[];
+}
+
 /** Mirrors backend/src/ws/messages.ts's ServerEvent union exactly. */
 export type ServerEvent =
   | { type: 'snapshot'; auction: Auction }

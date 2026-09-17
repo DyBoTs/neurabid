@@ -4,6 +4,7 @@ import { ConnectionStatus } from '../components/ui/ConnectionStatus';
 import { Table } from '../components/ui/Table';
 import tableStyles from '../components/ui/Table.module.css';
 import { useAdminBidStream } from '../hooks/useAdminBidStream';
+import { DemoControls } from '../components/DemoControls';
 import { getAdminDashboard } from '../api/admin';
 import type { AdminDashboard } from '../api/types';
 import styles from './Admin.module.css';
@@ -96,6 +97,11 @@ export function AdminPage() {
           <span className={styles.updatedAt}>Updated {lastUpdated.toLocaleTimeString()}</span>
         )}
       </div>
+
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>Demo Controls</div>
+        <DemoControls />
+      </section>
 
       <section className={styles.section}>
         <div className={styles.sectionTitle}>System Health</div>

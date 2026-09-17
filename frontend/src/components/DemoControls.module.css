@@ -1,0 +1,34 @@
+.row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.countInput {
+  width: 100px;
+}
+
+.feedback {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.feedback ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+}
+
+.simulatedLabel {
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.auctionLink {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}

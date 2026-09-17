@@ -4,9 +4,7 @@ import { HttpError } from '../httpError.js';
 import { isUuid } from '../validation.js';
 import { pool } from '../db.js';
 import { createAuction, getAuctionById, listAuctions } from '../services/getAuction.js';
-import { placeBid } from '../services/placeBid.js';
-import { broadcast, broadcastAdmin } from '../ws/broadcaster.js';
-import { recordBidAttempt } from '../metrics.js';
+import { placeBidAndAnnounce } from '../services/placeBidAndAnnounce.js';
 
 export const auctionsRouter = Router();
 
@@ -119,11 +117,12 @@ auctionsRouter.post(
  * The one endpoint the whole project exists to get right. All the actual
  * correctness logic (locking, validation, retries) lives in placeBid() —
  * see backend/src/services/placeBid.ts and docs/03-bid-engine.md. This
- * route is deliberately thin: parse/validate the HTTP-level inputs, call
- * placeBid(), and translate the result. It never decides whether a bid
- * wins, and it never responds — or broadcasts over WebSocket — before
- * placeBid()'s promise resolves, which only happens after the database
- * transaction has actually committed.
+ * route is deliberately thin: parse/validate the HTTP-level inputs, then
+ * delegate to placeBidAndAnnounce() (shared with the demo simulator —
+ * see services/placeBidAndAnnounce.ts) for the actual placeBid() call,
+ * metrics recording, and WebSocket broadcast. Nothing here ever responds
+ * — or broadcasts — before that call's promise resolves, which only
+ * happens after the database transaction has actually committed.
  */
 auctionsRouter.post(
   '/:id/bids',
@@ -140,35 +139,7 @@ auctionsRouter.post(
     }
 
     const amount = Number(req.body?.amount);
-
-    // Real latency measurement for the admin dashboard (docs/07-admin-
-    // dashboard.md) — timed around the actual placeBid() call, recorded
-    // for both outcomes, never estimated.
-    const startedAt = performance.now();
-    let result;
-    try {
-      result = await placeBid(auctionId, userId, amount);
-    } catch (err) {
-      recordBidAttempt('rejected', performance.now() - startedAt);
-      throw err;
-    }
-    recordBidAttempt('accepted', performance.now() - startedAt);
-
-    // Only reachable once placeBid()'s promise has resolved — i.e. only
-    // after COMMIT. Never move this above the placeBid() call.
-    const bidAcceptedEvent = {
-      type: 'bid_accepted' as const,
-      auctionId,
-      bidId: result.bidId,
-      amount: result.amount,
-      currentHighest: result.amount,
-      userId,
-      timestamp: new Date().toISOString(),
-    };
-    broadcast(auctionId, bidAcceptedEvent);
-    // The admin dashboard's live bid stream watches every auction at
-    // once, not just one room — see docs/07-admin-dashboard.md.
-    broadcastAdmin(bidAcceptedEvent);
+    const result = await placeBidAndAnnounce(auctionId, userId, amount);
 
     res.status(201).json(result);
   }),
