@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
 }
@@ -19,6 +19,7 @@
   font-size: var(--text-lg);
   color: var(--color-text);
   text-decoration: none;
+  letter-spacing: -0.01em;
 }
 
 .links {
@@ -27,11 +28,15 @@
   align-items: center;
 }
 
-.link {
+.link,
+.linkActive {
+  position: relative;
   color: var(--color-text-muted);
   text-decoration: none;
   font-size: var(--text-sm);
   font-weight: 600;
+  padding-block: var(--space-1);
+  transition: color var(--duration-micro) ease;
 }
 
 .link:hover,
@@ -39,10 +44,54 @@
   color: var(--color-text);
 }
 
+.link::after,
+.linkActive::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -13px;
+  height: 2px;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transition: transform var(--duration-state) ease;
+}
+
+.linkActive::after {
+  transform: scaleX(1);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--color-border);
+}
+
 .user {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
+}
+
+.logoutButton {
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--duration-micro) ease,
+    border-color var(--duration-micro) ease;
+}
+
+.logoutButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
 }
 
 .main {

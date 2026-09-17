@@ -10,7 +10,7 @@ describe('App', () => {
   it('renders the landing page at the root route', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) }));
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'NeuraBid' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /bid live/i, level: 1 })).toBeInTheDocument();
   });
 
   it('renders the navigation with a link to the marketplace', () => {

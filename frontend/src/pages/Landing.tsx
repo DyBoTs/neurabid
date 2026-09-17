@@ -1,53 +1,136 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
+import { LiveAuctionPreview } from '../components/LiveAuctionPreview';
 import styles from './Landing.module.css';
+
+const FEATURES = [
+  {
+    title: 'Live Bidding',
+    body: 'See new bids instantly without refreshing the page.',
+  },
+  {
+    title: 'Fair & Secure',
+    body: 'Every bid is checked against the latest auction state before it is accepted.',
+  },
+  {
+    title: 'Built for High Traffic',
+    body: 'Designed to stay responsive even when many people bid at once.',
+  },
+];
+
+const STEPS = [
+  {
+    number: '01',
+    title: 'Browse',
+    body: 'Discover live auctions and choose what you want to bid on.',
+  },
+  {
+    number: '02',
+    title: 'Bid Live',
+    body: 'Place your bid and see competing bids update instantly.',
+  },
+  {
+    number: '03',
+    title: 'Win With Confidence',
+    body: 'Your bid is validated against the latest auction state.',
+  },
+];
+
+const VALUES = [
+  {
+    title: 'Real-Time',
+    body: 'Everyone sees the latest auction state instantly.',
+  },
+  {
+    title: 'Consistent',
+    body: 'Bids are validated against the authoritative auction state.',
+  },
+  {
+    title: 'Reliable',
+    body: 'Designed to remain dependable when bidding activity spikes.',
+  },
+];
 
 /**
  * No fabricated stats or marketing copy here (per the project's anti-slop
- * rules) — every claim below is a real, verifiable property of the system
- * built in earlier phases (docs/03/04/05), not a placeholder.
+ * rules): the hero's live preview is the real product, not a mockup — see
+ * components/LiveAuctionPreview.tsx.
  */
 export function LandingPage() {
   return (
-    <div className={styles.hero}>
-      <h1>NeuraBid</h1>
-      <p>
-        A real-time auction platform where PostgreSQL — not the client, not a cache — decides whether a
-        bid wins. Built to prove that under concurrent bidding, the highest valid bid always wins, exactly
-        once, with no lost updates.
-      </p>
-      <div className={styles.actions}>
-        <Link to="/marketplace">
-          <Button>Browse Auctions</Button>
-        </Link>
-        <Link to="/create">
-          <Button variant="secondary">Create an Auction</Button>
-        </Link>
-      </div>
+    <div className={styles.page}>
+      <section className={styles.hero}>
+        <div className={styles.heroContent}>
+          <span className={styles.eyebrow}>Real-Time Auctions • Built for Scale</span>
+          <h1 className={styles.headline}>
+            Bid live.
+            <br />
+            Compete fairly.
+            <br />
+            Stay in sync.
+          </h1>
+          <p className={styles.subcopy}>
+            NeuraBid is a real-time auction platform where every bid is checked against the
+            latest auction state and every bidder watching sees it the instant it's accepted —
+            no refreshing, no guessing.
+          </p>
+          <div className={styles.actions}>
+            <Link to="/marketplace">
+              <Button>Browse Live Auctions</Button>
+            </Link>
+            <Link to="/create">
+              <Button variant="secondary">Create an Auction</Button>
+            </Link>
+          </div>
+          <ul className={styles.trustList}>
+            <li>Instant bid updates</li>
+            <li>Every bid validated</li>
+            <li>No page refresh needed</li>
+          </ul>
+        </div>
 
-      <div className={styles.facts}>
-        <div className={styles.fact}>
-          <h3>Locking, not luck</h3>
-          <p>
-            Every bid runs inside a database transaction that locks the auction row before validating it —
-            see docs/03-bid-engine.md.
-          </p>
+        <LiveAuctionPreview />
+      </section>
+
+      <section className={styles.features}>
+        <h2 className={styles.srOnly}>What you get</h2>
+        {FEATURES.map((feature) => (
+          <div key={feature.title} className={styles.featureCard}>
+            <h3>{feature.title}</h3>
+            <p>{feature.body}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className={styles.steps}>
+        <h2 className={styles.sectionHeading}>How NeuraBid Works</h2>
+        <div className={styles.stepsGrid}>
+          {STEPS.map((step) => (
+            <div key={step.number} className={styles.step}>
+              <span className={styles.stepNumber}>{step.number}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </div>
+          ))}
         </div>
-        <div className={styles.fact}>
-          <h3>Live, not polled</h3>
-          <p>
-            Accepted bids broadcast over WebSocket the instant they commit — never before. See
-            docs/05-realtime.md.
-          </p>
+      </section>
+
+      <section className={styles.values}>
+        <h2 className={styles.sectionHeading}>Built for Fast-Moving Auctions</h2>
+        <div className={styles.valuesGrid}>
+          {VALUES.map((value) => (
+            <div key={value.title} className={styles.valueCard}>
+              <h3>{value.title}</h3>
+              <p>{value.body}</p>
+            </div>
+          ))}
         </div>
-        <div className={styles.fact}>
-          <h3>Tested under real load</h3>
-          <p>
-            Concurrency correctness is verified with automated tests that fire dozens of simultaneous bids
-            and check the database directly — see docs/04-concurrency-testing.md.
-          </p>
-        </div>
-      </div>
+      </section>
+
+      <footer className={styles.footer}>
+        <span className={styles.footerBrand}>NeuraBid</span>
+        <span className={styles.footerTagline}>Real-time auctions, built for scale.</span>
+      </footer>
     </div>
   );
 }
