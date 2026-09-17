@@ -1,0 +1,15 @@
+{
+  "name": "neurabid",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real-time auction/bidding platform with PostgreSQL-authoritative bid correctness",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "test:backend": "npm test --workspace backend"
+  }
+}
