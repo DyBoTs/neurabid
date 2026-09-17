@@ -56,4 +56,16 @@ Three gaps got closed after the initial Phase 1 pass, all documented in full (wi
 - **`placeBid.transactionFailure.test.ts`** proves atomicity directly: it forces the `INSERT` to fail (a bid for a nonexistent user — a real foreign-key violation) and confirms, by re-reading the row, that `current_price`/`current_bid_id` are byte-for-byte unchanged and no bid row was created.
 - **`placeBid.retryAndLocking.test.ts`** tests the deadlock-retry and lock-timeout paths by mocking the Postgres driver, because our `FOR UPDATE`-on-one-row design structurally can't produce a real deadlock or serialization failure to test against honestly — see `docs/03-bid-engine.md` §6 for why that's a deliberate property, not a gap.
 
-**Not built yet:** no HTTP route calls `placeBid` — there's no way to place a bid over the network yet. That's Phase 2 (wiring this service to an Express endpoint and mapping `BidError` to HTTP responses).
+## Phase 2 — REST API
+
+**`HttpError` is now a shared base class**, and `placeBid.ts`'s `BidError extends HttpError`. Both mean the same thing at the HTTP layer ("reject with this status and this exact message"), but keeping `BidError` as its own (empty) subclass preserves the specific name where it matters — `placeBid`'s own retry loop checks `err instanceof BidError` to decide "never retry a business rejection," and that check still works unchanged.
+
+**Routes are deliberately thin.** `backend/src/routes/auctions.ts`'s bid endpoint parses/validates only what's specific to HTTP (is the id in the URL a real UUID, is there an `X-User-Id` header, coerce the JSON body's `amount` to a number) and then calls `placeBid()` — it contains zero bid-correctness logic itself. Route handlers are wrapped in `asyncHandler()` (`backend/src/asyncHandler.ts`) because Express 4 doesn't automatically catch a rejected promise from an async handler; without it, a thrown `HttpError` would just hang the request instead of reaching the error handler.
+
+**One central error handler**, registered after all routes in `server.ts`: any `HttpError` (including every `BidError`) becomes `res.status(err.status).json({ error: err.message })`; anything else becomes a generic `500` with the real error only logged server-side, never leaked to the client. This is what makes every rejection a "meaningful error" rather than either a raw stack trace or a silent hang.
+
+**Auth is a single header, on purpose.** `POST /api/users` is a get-or-create by username (`INSERT ... ON CONFLICT (username) DO UPDATE ... RETURNING`) — no password, and the returned `id` doubles as the "credential" sent back as `X-User-Id` on later requests. This is explicitly not real security; it's the smallest thing that lets multiple demo users bid against each other without building session infrastructure that isn't the point of this project. Documented in `docs/02-local-setup.md`.
+
+**Verified live, not just in tests:** with the backend actually running, `curl` was used to create a user, list auctions, fetch one, place a valid bid, attempt a too-low bid (409), attempt a bid with no `X-User-Id` (400), attempt a bid on a nonexistent auction (404), and attempt a bid on the seeded "not started yet" auction (403) — every response matched what the automated tests already claimed, confirming the tests reflect real HTTP behavior and not just in-process assumptions.
+
+**Not built yet:** no WebSocket layer — placing a bid via the API works, but nothing pushes the new price to other connected clients. That's Phase 3.

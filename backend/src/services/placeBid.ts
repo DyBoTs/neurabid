@@ -1,18 +1,12 @@
 import type { PoolClient } from 'pg';
 import { pool } from '../db.js';
+import { HttpError } from '../httpError.js';
 
 /**
  * A bid rejection the caller should show to the user as-is (wrong amount, auction
  * over, etc). Never retried — retrying wouldn't change the outcome.
  */
-export class BidError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export class BidError extends HttpError {}
 
 export interface PlacedBid {
   bidId: string;

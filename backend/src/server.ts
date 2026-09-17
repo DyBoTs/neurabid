@@ -1,7 +1,11 @@
 import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { config } from './config.js';
 import { pool } from './db.js';
 import { ensureRedisConnected, redis } from './redis.js';
+import { HttpError } from './httpError.js';
+import { usersRouter } from './routes/users.js';
+import { auctionsRouter } from './routes/auctions.js';
 
 export const app = express();
 app.use(express.json());
@@ -33,6 +37,21 @@ app.get('/health', async (_req, res) => {
     ...(dbError ? { dbError } : {}),
     ...(redisError ? { redisError } : {}),
   });
+});
+
+app.use('/api/users', usersRouter);
+app.use('/api/auctions', auctionsRouter);
+
+// Central error handler. Must be registered after all routes, and must
+// declare all four parameters for Express to recognize it as an error
+// handler (even though req/next go unused here).
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+  console.error('Unexpected error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 if (process.env.VITEST !== 'true') {
