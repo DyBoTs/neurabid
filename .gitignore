@@ -10,3 +10,5 @@ frontend/.env
 coverage/
 *.tsbuildinfo
 node_modules/.tmp/
+tools/
+tests/load/results/
