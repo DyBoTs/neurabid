@@ -1,0 +1,18 @@
+.price {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-text);
+  transition: background-color var(--duration-state) ease;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1);
+}
+
+.flash {
+  background-color: color-mix(in srgb, var(--color-positive) 35%, transparent);
+}
+
+.large {
+  font-size: var(--text-2xl);
+  display: inline-block;
+}

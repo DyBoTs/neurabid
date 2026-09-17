@@ -1,0 +1,36 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.connecting,
+.reconnecting {
+  color: var(--color-warning);
+}
+
+.connected {
+  color: var(--color-positive);
+}
+
+.disconnected {
+  color: var(--color-negative);
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
