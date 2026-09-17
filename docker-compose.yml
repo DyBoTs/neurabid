@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: neurabid-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:-neurabid_app}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-neurabid_local_dev_pw}
+      POSTGRES_DB: ${PGDATABASE:-neurabid}
+    ports:
+      - "${PG_HOST_PORT:-5433}:5432"
+    volumes:
+      - neurabid_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-neurabid_app} -d ${PGDATABASE:-neurabid}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: neurabid-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - neurabid_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  neurabid_pg_data:
+  neurabid_redis_data:

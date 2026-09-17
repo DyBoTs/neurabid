@@ -7,3 +7,6 @@ backend/.env
 frontend/.env
 *.log
 .DS_Store
+coverage/
+*.tsbuildinfo
+node_modules/.tmp/
