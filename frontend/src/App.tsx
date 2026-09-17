@@ -1,40 +1,29 @@
-import { useEffect, useState } from 'react';
-
-type HealthResponse = {
-  status: 'ok' | 'degraded';
-  checks: Record<string, 'ok' | 'error'>;
-};
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
+import { Layout } from './components/Layout';
+import { LandingPage } from './pages/Landing';
+import { LoginPage } from './pages/Login';
+import { MarketplacePage } from './pages/Marketplace';
+import { LiveAuctionPage } from './pages/LiveAuction';
+import { CreateAuctionPage } from './pages/CreateAuction';
+import { BidHistoryPage } from './pages/BidHistory';
 
 function App() {
-  const [health, setHealth] = useState<HealthResponse | 'loading' | 'unreachable'>('loading');
-
-  useEffect(() => {
-    fetch('/health')
-      .then((res) => res.json())
-      .then((data: HealthResponse) => setHealth(data))
-      .catch(() => setHealth('unreachable'));
-  }, []);
-
   return (
-    <main>
-      <h1>NeuraBid</h1>
-      <p>Foundation checkpoint — bidding UI is not built yet.</p>
-      <h2>Backend connectivity</h2>
-      {health === 'loading' && <p>Checking backend...</p>}
-      {health === 'unreachable' && (
-        <p role="alert">Backend unreachable at /health (is `npm run dev:backend` running?)</p>
-      )}
-      {typeof health === 'object' && (
-        <ul>
-          <li>Overall: {health.status}</li>
-          {Object.entries(health.checks).map(([name, status]) => (
-            <li key={name}>
-              {name}: {status}
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+    <BrowserRouter>
+      <AuthProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/marketplace" element={<MarketplacePage />} />
+            <Route path="/auctions/:id" element={<LiveAuctionPage />} />
+            <Route path="/create" element={<CreateAuctionPage />} />
+            <Route path="/my-bids" element={<BidHistoryPage />} />
+          </Routes>
+        </Layout>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

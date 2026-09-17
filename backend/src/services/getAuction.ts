@@ -57,3 +57,24 @@ export async function listAuctions(): Promise<AuctionDTO[]> {
   );
   return rows.map(toDTO);
 }
+
+export interface CreateAuctionInput {
+  title: string;
+  description: string | null;
+  startingPrice: number;
+  minIncrement: number;
+  durationMinutes: number;
+}
+
+/** New auctions start immediately (starts_at = now()) — scheduling a future
+ * start isn't exposed in the UI yet, though the schema/placeBid already
+ * support it (see the seeded "not started" auction from Phase 1). */
+export async function createAuction(input: CreateAuctionInput): Promise<AuctionDTO> {
+  const { rows } = await pool.query<AuctionRow>(
+    `INSERT INTO auctions (title, description, starting_price, current_price, min_increment, status, starts_at, ends_at)
+     VALUES ($1, $2, $3, $3, $4, 'active', now(), now() + make_interval(mins => $5))
+     RETURNING *`,
+    [input.title, input.description, input.startingPrice, input.minIncrement, input.durationMinutes],
+  );
+  return toDTO(rows[0]);
+}

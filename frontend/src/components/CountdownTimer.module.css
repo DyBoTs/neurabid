@@ -1,0 +1,14 @@
+.timer {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.endingSoon {
+  color: var(--color-warning);
+}
+
+.ended {
+  color: var(--color-negative);
+}

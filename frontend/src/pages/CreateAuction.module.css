@@ -1,0 +1,11 @@
+.form {
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.error {
+  color: var(--color-negative);
+  font-size: var(--text-sm);
+}

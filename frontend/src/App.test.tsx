@@ -7,18 +7,15 @@ describe('App', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the foundation checkpoint heading', () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ json: () => Promise.resolve({ status: 'ok', checks: {} }) }),
-    );
+  it('renders the landing page at the root route', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) }));
     render(<App />);
     expect(screen.getByRole('heading', { name: 'NeuraBid' })).toBeInTheDocument();
   });
 
-  it('shows unreachable message when the backend fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+  it('renders the navigation with a link to the marketplace', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) }));
     render(<App />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Backend unreachable');
+    expect(screen.getByRole('link', { name: 'Marketplace' })).toBeInTheDocument();
   });
 });

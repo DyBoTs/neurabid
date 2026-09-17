@@ -1,0 +1,79 @@
+.layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-5);
+}
+
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.titleBlock h1 {
+  font-size: var(--text-xl);
+}
+
+.priceBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.priceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.endedBanner {
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-negative) 15%, transparent);
+  color: var(--color-negative);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-4);
+  font-weight: 600;
+}
+
+.section {
+  margin-bottom: var(--space-5);
+}
+
+.section h2 {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.centered {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-text-muted);
+}

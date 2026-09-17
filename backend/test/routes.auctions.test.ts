@@ -2,10 +2,32 @@ import { afterAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/server.js';
 import { pool } from '../src/db.js';
+import { placeBid } from '../src/services/placeBid.js';
 import { createTestAuction, createTestUser } from './helpers.js';
 
 afterAll(async () => {
   await pool.end();
+});
+
+describe('GET /api/auctions/:id/bids', () => {
+  it('returns an empty array for an auction with no bids', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 5 });
+    const res = await request(app).get(`/api/auctions/${auctionId}/bids`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it('lists bids most recent first, with username joined in', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 5 });
+    const userId = await createTestUser();
+    const bid = await placeBid(auctionId, userId, 110);
+
+    const res = await request(app).get(`/api/auctions/${auctionId}/bids`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({ bidId: bid.bidId, amount: 110, userId });
+    expect(typeof res.body[0].username).toBe('string');
+  });
 });
 
 describe('GET /api/auctions', () => {
@@ -22,6 +44,60 @@ describe('GET /api/auctions', () => {
       currentPrice: expect.any(Number),
       status: expect.any(String),
     });
+  });
+});
+
+describe('POST /api/auctions', () => {
+  it('creates a new active auction with the given values', async () => {
+    const res = await request(app).post('/api/auctions').send({
+      title: 'Test Vintage Camera',
+      description: 'Works great',
+      startingPrice: 25,
+      minIncrement: 5,
+      durationMinutes: 30,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      title: 'Test Vintage Camera',
+      startingPrice: 25,
+      currentPrice: 25,
+      minIncrement: 5,
+      status: 'active',
+    });
+
+    const getRes = await request(app).get(`/api/auctions/${res.body.id}`);
+    expect(getRes.status).toBe(200);
+  });
+
+  it('rejects a title that is too short', async () => {
+    const res = await request(app).post('/api/auctions').send({
+      title: 'ab',
+      startingPrice: 25,
+      minIncrement: 5,
+      durationMinutes: 30,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-positive starting price', async () => {
+    const res = await request(app).post('/api/auctions').send({
+      title: 'Valid Title',
+      startingPrice: 0,
+      minIncrement: 5,
+      durationMinutes: 30,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an unreasonable duration', async () => {
+    const res = await request(app).post('/api/auctions').send({
+      title: 'Valid Title',
+      startingPrice: 25,
+      minIncrement: 5,
+      durationMinutes: 999_999,
+    });
+    expect(res.status).toBe(400);
   });
 });
 
