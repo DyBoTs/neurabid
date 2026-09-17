@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { BidError, placeBid } from '../src/services/placeBid.js';
+import { placeBid } from '../src/services/placeBid.js';
 import { pool } from '../src/db.js';
 import { createTestAuction, createTestUser } from './helpers.js';
 
@@ -8,16 +8,7 @@ describe('placeBid validation (single-bidder cases)', () => {
     await pool.end();
   });
 
-  it('rejects a bid below current_price + min_increment', async () => {
-    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 10 });
-    const userId = await createTestUser();
-
-    await expect(placeBid(auctionId, userId, 105)).rejects.toMatchObject({
-      status: 409,
-    } satisfies Partial<BidError>);
-  });
-
-  it('accepts a bid that meets current_price + min_increment exactly', async () => {
+  it('valid bid: accepts a bid that meets current_price + min_increment exactly', async () => {
     const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 10 });
     const userId = await createTestUser();
 
@@ -30,7 +21,42 @@ describe('placeBid validation (single-bidder cases)', () => {
     expect(Number(rows[0].current_price)).toBe(110);
   });
 
-  it('rejects a bid on an already-ended auction', async () => {
+  it('low bid: rejects a bid below the current price', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 10 });
+    const userId = await createTestUser();
+
+    await expect(placeBid(auctionId, userId, 90)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('equal bid: rejects a bid exactly equal to the current price', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 10 });
+    const userId = await createTestUser();
+
+    await expect(placeBid(auctionId, userId, 100)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('below increment: rejects a bid above the current price but under the minimum increment', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 10 });
+    const userId = await createTestUser();
+
+    // 105 > current price (100) but < required minimum (110)
+    await expect(placeBid(auctionId, userId, 105)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('not started: rejects a bid on an auction whose starts_at is in the future', async () => {
+    const auctionId = await createTestAuction({
+      startingPrice: 100,
+      minIncrement: 10,
+      status: 'scheduled',
+      startsInMs: 60_000,
+      endsInMs: 120_000,
+    });
+    const userId = await createTestUser();
+
+    await expect(placeBid(auctionId, userId, 200)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('ended auction: rejects a bid whose status is already ended', async () => {
     const auctionId = await createTestAuction({
       startingPrice: 100,
       minIncrement: 10,
@@ -41,10 +67,11 @@ describe('placeBid validation (single-bidder cases)', () => {
     await expect(placeBid(auctionId, userId, 200)).rejects.toMatchObject({ status: 410 });
   });
 
-  it('rejects a bid on an auction whose ends_at has already passed', async () => {
+  it('ended auction: rejects a bid whose ends_at has already passed, even if status was never swept', async () => {
     const auctionId = await createTestAuction({
       startingPrice: 100,
       minIncrement: 10,
+      status: 'active',
       endsInMs: -1000,
     });
     const userId = await createTestUser();

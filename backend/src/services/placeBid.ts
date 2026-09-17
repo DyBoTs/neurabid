@@ -24,6 +24,7 @@ interface AuctionRow {
   current_price: string;
   min_increment: string;
   status: string;
+  starts_at: string;
   ends_at: string;
 }
 
@@ -102,11 +103,16 @@ async function runBidTransaction(
       throw new BidError(404, 'Auction not found');
     }
 
-    if (auction.status !== 'active') {
-      throw new BidError(410, 'This auction is not active');
-    }
-    if (new Date(auction.ends_at).getTime() <= Date.now()) {
+    const now = Date.now();
+
+    // Checked in this order deliberately: an auction that's already over
+    // gets "ended" even if, say, its status was never swept to 'ended' —
+    // ends_at is the real deadline, status is a secondary signal.
+    if (auction.status === 'ended' || new Date(auction.ends_at).getTime() <= now) {
       throw new BidError(410, 'This auction has ended');
+    }
+    if (auction.status === 'scheduled' || new Date(auction.starts_at).getTime() > now) {
+      throw new BidError(403, 'This auction has not started yet');
     }
 
     const currentPrice = Number(auction.current_price);
@@ -143,7 +149,7 @@ async function runBidTransaction(
 
 async function lockAuction(client: PoolClient, auctionId: string): Promise<AuctionRow | null> {
   const { rows } = await client.query<AuctionRow>(
-    `SELECT current_price, min_increment, status, ends_at
+    `SELECT current_price, min_increment, status, starts_at, ends_at
      FROM auctions
      WHERE id = $1
      FOR UPDATE`,

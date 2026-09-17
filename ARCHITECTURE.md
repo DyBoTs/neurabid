@@ -48,4 +48,12 @@ This is the single most important file in the project — the whole hackathon th
 
 **Validation tests are separate from the concurrency test on purpose** (`placeBid.validation.test.ts`). They cover the single-bidder business rules (bid too low, auction ended, auction not found, non-positive amount) without any concurrency involved, so a failure there points at broken validation logic, while a failure in the concurrency test points at a race condition — keeping those two failure modes distinguishable was worth two small files instead of one bigger one.
 
+## Phase 1, extended — "not started", atomicity, and locking-failure tests
+
+Three gaps got closed after the initial Phase 1 pass, all documented in full (with diagrams and real test output) in **`docs/03-bid-engine.md`** — that file is the canonical write-up; this is just a pointer:
+
+- **`auctions.starts_at`** (migration `003`) — the schema previously had no way to reject a bid on an auction that hasn't opened yet. Checked the same way `ends_at` is: both the `status` column and the actual timestamp are checked, so a bid is correctly rejected even if a status field was never sweeped to match reality.
+- **`placeBid.transactionFailure.test.ts`** proves atomicity directly: it forces the `INSERT` to fail (a bid for a nonexistent user — a real foreign-key violation) and confirms, by re-reading the row, that `current_price`/`current_bid_id` are byte-for-byte unchanged and no bid row was created.
+- **`placeBid.retryAndLocking.test.ts`** tests the deadlock-retry and lock-timeout paths by mocking the Postgres driver, because our `FOR UPDATE`-on-one-row design structurally can't produce a real deadlock or serialization failure to test against honestly — see `docs/03-bid-engine.md` §6 for why that's a deliberate property, not a gap.
+
 **Not built yet:** no HTTP route calls `placeBid` — there's no way to place a bid over the network yet. That's Phase 2 (wiring this service to an Express endpoint and mapping `BidError` to HTTP responses).
