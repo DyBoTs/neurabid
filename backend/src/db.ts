@@ -9,4 +9,5 @@ export const pool = new Pool({
   user: config.postgres.user,
   password: config.postgres.password,
   database: config.postgres.database,
+  max: 20,
 });
