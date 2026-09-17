@@ -25,6 +25,14 @@
 .title {
   font-weight: 600;
   font-size: var(--text-base);
+  /* Cards are a preview grid — keep heights consistent even for a very
+     long title (the full title is always shown on the auction's own
+     page). Without this, one long title breaks every card's alignment
+     in the row (docs/06-design-system.md's layout-quality principle). */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .priceRow {

@@ -8,10 +8,12 @@
   display: flex;
   gap: var(--space-3);
   align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .row > :first-child {
   flex: 1;
+  min-width: 160px;
 }
 
 .feedback {
