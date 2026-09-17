@@ -11,6 +11,21 @@ import type { ServerEvent } from './messages.js';
  */
 const rooms = new Map<string, Set<WebSocket>>();
 
+/**
+ * The admin dashboard's live bid stream watches every auction at once,
+ * not one — a separate set, not a room keyed by auction id, since it has
+ * no single auctionId of its own.
+ */
+const adminSockets = new Set<WebSocket>();
+
+/** Every currently-open connection, subscribed or not — the source of
+ * truth for the admin dashboard's WebSocket health indicator. */
+const allConnections = new Set<WebSocket>();
+
+export function registerConnection(socket: WebSocket): void {
+  allConnections.add(socket);
+}
+
 export function subscribe(auctionId: string, socket: WebSocket): void {
   let room = rooms.get(auctionId);
   if (!room) {
@@ -20,7 +35,11 @@ export function subscribe(auctionId: string, socket: WebSocket): void {
   room.add(socket);
 }
 
-/** Called when a socket disconnects — removes it from every room it was in. */
+export function subscribeAdmin(socket: WebSocket): void {
+  adminSockets.add(socket);
+}
+
+/** Called when a socket disconnects — removes it from every room (and the admin set) it was in. */
 export function unsubscribeAll(socket: WebSocket): void {
   for (const [auctionId, room] of rooms) {
     room.delete(socket);
@@ -28,6 +47,8 @@ export function unsubscribeAll(socket: WebSocket): void {
       rooms.delete(auctionId);
     }
   }
+  adminSockets.delete(socket);
+  allConnections.delete(socket);
 }
 
 /**
@@ -49,7 +70,24 @@ export function broadcast(auctionId: string, message: ServerEvent): void {
   }
 }
 
+/** Same delivery rule as broadcast(): only ever call this after a commit. */
+export function broadcastAdmin(message: ServerEvent): void {
+  if (adminSockets.size === 0) return;
+  const payload = JSON.stringify(message);
+  for (const socket of adminSockets) {
+    if (socket.readyState === socket.OPEN) {
+      socket.send(payload);
+    }
+  }
+}
+
 /** Test-only escape hatch to inspect room state without a real socket. */
 export function roomSize(auctionId: string): number {
   return rooms.get(auctionId)?.size ?? 0;
+}
+
+/** Real, live count of currently-connected sockets — used by the admin
+ * dashboard's WebSocket health indicator (see docs/07-admin-dashboard.md). */
+export function connectionCount(): number {
+  return allConnections.size;
 }

@@ -40,6 +40,35 @@ export interface UserBid {
   isWinning: boolean;
 }
 
+/** Mirrors GET /api/admin/dashboard's response shape exactly. */
+export interface AdminDashboard {
+  health: {
+    api: 'ok';
+    db: 'ok' | 'error';
+    redis: 'ok' | 'error';
+    websocket: { status: 'ok'; connections: number };
+  };
+  auctionOverview: {
+    activeAuctions: number;
+    currentHighestBid: { auctionId: string; title: string; amount: number } | null;
+  };
+  performance: {
+    totalBidAttempts: number;
+    acceptedBids: number;
+    rejectedBids: number;
+    bidsPerSecond: number | null;
+    avgLatencyMs: number | null;
+    p95LatencyMs: number | null;
+    p99LatencyMs: number | null;
+  };
+  correctness: {
+    status: 'verified' | 'violations_found' | 'not_measured_yet';
+    checkedAuctions: number;
+    violations: { auctionId: string; message: string }[];
+    checkedAt: string;
+  };
+}
+
 /** Mirrors backend/src/ws/messages.ts's ServerEvent union exactly. */
 export type ServerEvent =
   | { type: 'snapshot'; auction: Auction }

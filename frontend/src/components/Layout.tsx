@@ -19,6 +19,9 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavLink to="/create" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
             Create Auction
           </NavLink>
+          <NavLink to="/admin" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
+            Admin
+          </NavLink>
           {user && (
             <NavLink to="/my-bids" className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}>
               My Bids

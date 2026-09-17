@@ -5,7 +5,8 @@ import { isUuid } from '../validation.js';
 import { pool } from '../db.js';
 import { createAuction, getAuctionById, listAuctions } from '../services/getAuction.js';
 import { placeBid } from '../services/placeBid.js';
-import { broadcast } from '../ws/broadcaster.js';
+import { broadcast, broadcastAdmin } from '../ws/broadcaster.js';
+import { recordBidAttempt } from '../metrics.js';
 
 export const auctionsRouter = Router();
 
@@ -139,19 +140,35 @@ auctionsRouter.post(
     }
 
     const amount = Number(req.body?.amount);
-    const result = await placeBid(auctionId, userId, amount);
+
+    // Real latency measurement for the admin dashboard (docs/07-admin-
+    // dashboard.md) — timed around the actual placeBid() call, recorded
+    // for both outcomes, never estimated.
+    const startedAt = performance.now();
+    let result;
+    try {
+      result = await placeBid(auctionId, userId, amount);
+    } catch (err) {
+      recordBidAttempt('rejected', performance.now() - startedAt);
+      throw err;
+    }
+    recordBidAttempt('accepted', performance.now() - startedAt);
 
     // Only reachable once placeBid()'s promise has resolved — i.e. only
     // after COMMIT. Never move this above the placeBid() call.
-    broadcast(auctionId, {
-      type: 'bid_accepted',
+    const bidAcceptedEvent = {
+      type: 'bid_accepted' as const,
       auctionId,
       bidId: result.bidId,
       amount: result.amount,
       currentHighest: result.amount,
       userId,
       timestamp: new Date().toISOString(),
-    });
+    };
+    broadcast(auctionId, bidAcceptedEvent);
+    // The admin dashboard's live bid stream watches every auction at
+    // once, not just one room — see docs/07-admin-dashboard.md.
+    broadcastAdmin(bidAcceptedEvent);
 
     res.status(201).json(result);
   }),

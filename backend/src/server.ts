@@ -8,6 +8,7 @@ import { ensureRedisConnected, redis } from './redis.js';
 import { HttpError } from './httpError.js';
 import { usersRouter } from './routes/users.js';
 import { auctionsRouter } from './routes/auctions.js';
+import { adminRouter } from './routes/admin.js';
 import { attachWebSocketServer } from './ws/wsServer.js';
 import { startAuctionEndSweep } from './services/auctionEndSweep.js';
 
@@ -52,6 +53,7 @@ app.get('/health', async (_req, res) => {
 
 app.use('/api/users', usersRouter);
 app.use('/api/auctions', auctionsRouter);
+app.use('/api/admin', adminRouter);
 
 // Central error handler. Must be registered after all routes, and must
 // declare all four parameters for Express to recognize it as an error

@@ -7,6 +7,7 @@ import { MarketplacePage } from './pages/Marketplace';
 import { LiveAuctionPage } from './pages/LiveAuction';
 import { CreateAuctionPage } from './pages/CreateAuction';
 import { BidHistoryPage } from './pages/BidHistory';
+import { AdminPage } from './pages/Admin';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/auctions/:id" element={<LiveAuctionPage />} />
             <Route path="/create" element={<CreateAuctionPage />} />
             <Route path="/my-bids" element={<BidHistoryPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </Layout>
       </AuthProvider>
