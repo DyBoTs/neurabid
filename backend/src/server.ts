@@ -6,6 +6,8 @@ import { ensureRedisConnected, redis } from './redis.js';
 import { HttpError } from './httpError.js';
 import { usersRouter } from './routes/users.js';
 import { auctionsRouter } from './routes/auctions.js';
+import { attachWebSocketServer } from './ws/wsServer.js';
+import { startAuctionEndSweep } from './services/auctionEndSweep.js';
 
 export const app = express();
 app.use(express.json());
@@ -55,7 +57,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.VITEST !== 'true') {
-  app.listen(config.port, () => {
+  const httpServer = app.listen(config.port, () => {
     console.log(`neurabid backend listening on http://localhost:${config.port}`);
   });
+  attachWebSocketServer(httpServer);
+  startAuctionEndSweep();
 }

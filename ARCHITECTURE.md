@@ -73,3 +73,17 @@ Three gaps got closed after the initial Phase 1 pass, all documented in full (wi
 ## Concurrency Testing Deep-Dive
 
 `backend/test/concurrencyProof.test.ts` and the shared invariant checker (`backend/test/invariants.ts`) get their own full write-up in **`docs/04-concurrency-testing.md`** — scenario-by-scenario explanations, what each invariant check actually verifies against the raw database, and real (not fabricated) output from 5 consecutive full test-suite runs, included specifically to show the accept/reject counts genuinely vary between runs while every correctness invariant holds every time. That file is the canonical reference for "how do we know this is actually safe under concurrency" — this note is just a pointer to it.
+
+## Phase 3 — WebSocket Layer
+
+**Rooms are a plain in-process `Map`, not Redis pub/sub** (`backend/src/ws/broadcaster.ts`). The original plan (`docs/01-project-plan.md` §9) sketched Redis pub/sub as the way to fan a broadcast out across multiple backend instances. With exactly one backend process, an in-process `Map<auctionId, Set<WebSocket>>` does the same job with less to build and explain — Redis pub/sub is the documented upgrade path if this ever ran as more than one instance, not something needed now.
+
+**Broadcast-after-commit is enforced by where the call is written, not by a framework guarantee.** `routes/auctions.ts`'s bid endpoint calls `broadcast(...)` on the line immediately after `await placeBid(...)` succeeds — and `placeBid()`'s promise only resolves after its transaction's `COMMIT` has actually completed (see `docs/03-bid-engine.md` §3). `backend/test/ws.integration.test.ts` proves this isn't just an intention: it subscribes a real WebSocket client, fires a real too-low bid over real HTTP, and asserts zero messages arrive — a rejected attempt produces no broadcast at all, successful or otherwise.
+
+**Snapshot-on-subscribe, not "wait for the next event".** A client that just connected (or reconnected after a drop) needs the *current* truth immediately, not a promise of future updates — `wsServer.ts` responds to every `subscribe` with a full snapshot pulled from the same `getAuctionById()` the REST API uses (`backend/src/services/getAuction.ts`, extracted specifically so the two can't drift apart).
+
+**The auction-end sweep is a plain `setInterval`, not a queue or cron library.** `startAuctionEndSweep()` runs one `UPDATE ... WHERE status = 'active' AND ends_at <= now() RETURNING ...` every 2 seconds. The `WHERE status = 'active'` clause is what makes it safe to run forever without re-announcing the same ended auction twice — once a row flips to `'ended'`, it stops matching. Bids on an expired auction are already correctly rejected by `placeBid()` itself with no help from this sweep (see `docs/03-bid-engine.md` §3) — the sweep's only job is making the `status` column and connected clients actually learn about it, since nothing else would ever tell them.
+
+**Verified live, with the actual dev server running**, not just in tests: connected a real WebSocket client and (1) received a snapshot on subscribe, (2) received a `bid_accepted` broadcast immediately after placing a real bid over HTTP, with the `bidId` matching the REST response exactly, and (3) watched a seeded auction (30s lifetime) autonomously flip to `ended` and broadcast `auction_ended` with zero manual triggering, purely from the sweep running in the background.
+
+**Not built yet:** no frontend UI consumes any of this — the placeholder page still only calls `/health`. That's Phase 4.

@@ -2,46 +2,16 @@ import { Router } from 'express';
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
 import { isUuid } from '../validation.js';
-import { pool } from '../db.js';
+import { getAuctionById, listAuctions } from '../services/getAuction.js';
 import { placeBid } from '../services/placeBid.js';
+import { broadcast } from '../ws/broadcaster.js';
 
 export const auctionsRouter = Router();
-
-interface AuctionRow {
-  id: string;
-  title: string;
-  description: string | null;
-  starting_price: string;
-  current_price: string;
-  min_increment: string;
-  status: string;
-  starts_at: string;
-  ends_at: string;
-  current_bid_id: string | null;
-}
-
-function serializeAuction(row: AuctionRow) {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    startingPrice: Number(row.starting_price),
-    currentPrice: Number(row.current_price),
-    minIncrement: Number(row.min_increment),
-    status: row.status,
-    startsAt: row.starts_at,
-    endsAt: row.ends_at,
-    currentBidId: row.current_bid_id,
-  };
-}
 
 auctionsRouter.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const { rows } = await pool.query<AuctionRow>(
-      `SELECT * FROM auctions ORDER BY (status = 'active') DESC, ends_at ASC`,
-    );
-    res.json(rows.map(serializeAuction));
+    res.json(await listAuctions());
   }),
 );
 
@@ -51,10 +21,10 @@ auctionsRouter.get(
     const { id } = req.params;
     if (!isUuid(id)) throw new HttpError(400, 'Invalid auction id');
 
-    const { rows } = await pool.query<AuctionRow>('SELECT * FROM auctions WHERE id = $1', [id]);
-    if (!rows[0]) throw new HttpError(404, 'Auction not found');
+    const auction = await getAuctionById(id);
+    if (!auction) throw new HttpError(404, 'Auction not found');
 
-    res.json(serializeAuction(rows[0]));
+    res.json(auction);
   }),
 );
 
@@ -64,8 +34,9 @@ auctionsRouter.get(
  * see backend/src/services/placeBid.ts and docs/03-bid-engine.md. This
  * route is deliberately thin: parse/validate the HTTP-level inputs, call
  * placeBid(), and translate the result. It never decides whether a bid
- * wins, and it never responds before placeBid()'s promise resolves — which
- * only happens after the database transaction has actually committed.
+ * wins, and it never responds — or broadcasts over WebSocket — before
+ * placeBid()'s promise resolves, which only happens after the database
+ * transaction has actually committed.
  */
 auctionsRouter.post(
   '/:id/bids',
@@ -83,6 +54,17 @@ auctionsRouter.post(
 
     const amount = Number(req.body?.amount);
     const result = await placeBid(auctionId, userId, amount);
+
+    // Only reachable once placeBid()'s promise has resolved — i.e. only
+    // after COMMIT. Never move this above the placeBid() call.
+    broadcast(auctionId, {
+      type: 'bid_accepted',
+      auctionId,
+      bidId: result.bidId,
+      amount: result.amount,
+      userId,
+      at: new Date().toISOString(),
+    });
 
     res.status(201).json(result);
   }),
