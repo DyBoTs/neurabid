@@ -48,7 +48,13 @@ describe('WebSocket integration (real server, real socket)', () => {
     return ws;
   }
 
-  it('sends a full snapshot immediately on subscribe', async () => {
+  it('connection: a client can open a WebSocket connection to the server', async () => {
+    const ws = await connect();
+    expect(ws.readyState).toBe(ws.OPEN);
+    ws.close();
+  });
+
+  it('subscription: sends a full snapshot immediately on subscribe', async () => {
     const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 5 });
     const ws = await connect();
 
@@ -74,9 +80,10 @@ describe('WebSocket integration (real server, real socket)', () => {
     ws.close();
   });
 
-  it('broadcasts bid_accepted to a subscribed client, and only after the HTTP request has actually completed', async () => {
+  it('accepted event: broadcasts bid_accepted with all required fields, only after the HTTP request has actually completed', async () => {
     const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 5 });
     const userId = await createTestUser();
+    const beforeRequest = Date.now();
     const ws = await connect();
 
     const snapshotPromise = nextMessage(ws);
@@ -98,18 +105,23 @@ describe('WebSocket integration (real server, real socket)', () => {
     const bidResult = (await res.json()) as { bidId: string };
 
     const bidMessage = await bidMessagePromise;
+    // Every field required by the spec: auction ID, bid ID, amount,
+    // timestamp, current highest.
     expect(bidMessage).toMatchObject({
       type: 'bid_accepted',
       auctionId,
       bidId: bidResult.bidId,
       amount: 110,
+      currentHighest: 110,
       userId,
     });
+    expect(typeof bidMessage.timestamp).toBe('string');
+    expect(new Date(bidMessage.timestamp as string).getTime()).toBeGreaterThanOrEqual(beforeRequest);
 
     ws.close();
   });
 
-  it('does not broadcast a rejected (too-low) bid attempt to subscribers', async () => {
+  it('rejection: does not broadcast a rejected (too-low) bid attempt to subscribers', async () => {
     const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 10 });
     const userId = await createTestUser();
     const ws = await connect();
@@ -136,5 +148,71 @@ describe('WebSocket integration (real server, real socket)', () => {
     expect(receivedUnexpectedMessage).toBe(false);
 
     ws.close();
+  });
+
+  it('reconnect: a client can close its connection and open a brand new one without any special handshake', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 5 });
+
+    const firstConnection = await connect();
+    const firstSnapshot = nextMessage(firstConnection);
+    firstConnection.send(JSON.stringify({ type: 'subscribe', auctionId }));
+    expect((await firstSnapshot).type).toBe('snapshot');
+
+    // Simulate a dropped connection: close it, then open an entirely new
+    // socket — there is no session/token to carry over. The server treats
+    // it exactly like any other fresh connection.
+    firstConnection.close();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const secondConnection = await connect();
+    const secondSnapshot = nextMessage(secondConnection);
+    secondConnection.send(JSON.stringify({ type: 'subscribe', auctionId }));
+    const message = await secondSnapshot;
+
+    expect(message.type).toBe('snapshot');
+    expect((message.auction as { id: string }).id).toBe(auctionId);
+
+    secondConnection.close();
+  });
+
+  it('state resync: reconnecting after missing a bid gets the TRUE current state, not stale or replayed data', async () => {
+    const auctionId = await createTestAuction({ startingPrice: 100, minIncrement: 5 });
+    const userId = await createTestUser();
+
+    const firstConnection = await connect();
+    const firstSnapshot = nextMessage(firstConnection);
+    firstConnection.send(JSON.stringify({ type: 'subscribe', auctionId }));
+    const initialSnapshot = await firstSnapshot;
+    expect((initialSnapshot.auction as { currentPrice: number }).currentPrice).toBe(100);
+
+    // The client "goes offline" — connection closes before the bid below
+    // is placed, so it cannot possibly have received a bid_accepted event
+    // for it.
+    firstConnection.close();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const res = await fetch(`http://localhost:${port}/api/auctions/${auctionId}/bids`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+      body: JSON.stringify({ amount: 130 }),
+    });
+    expect(res.status).toBe(201);
+    const bidResult = (await res.json()) as { bidId: string };
+
+    // Reconnect: a brand new socket, re-subscribing exactly as it would
+    // after any other reconnect. It must NOT show the stale $100 it saw
+    // before disconnecting — the resync must reflect what actually
+    // happened while it was gone, straight from the database.
+    const secondConnection = await connect();
+    const resyncPromise = nextMessage(secondConnection);
+    secondConnection.send(JSON.stringify({ type: 'subscribe', auctionId }));
+    const resync = await resyncPromise;
+
+    expect(resync.type).toBe('snapshot');
+    const auction = resync.auction as { currentPrice: number; currentBidId: string };
+    expect(auction.currentPrice).toBe(130);
+    expect(auction.currentBidId).toBe(bidResult.bidId);
+
+    secondConnection.close();
   });
 });

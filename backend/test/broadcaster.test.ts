@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 import { broadcast, roomSize, subscribe, unsubscribeAll } from '../src/ws/broadcaster.js';
+import type { BidAcceptedEvent } from '../src/ws/messages.js';
 
 function fakeSocket(readyState: number = 1 /* OPEN */) {
   return {
@@ -8,6 +9,19 @@ function fakeSocket(readyState: number = 1 /* OPEN */) {
     OPEN: 1,
     send: vi.fn(),
   } as unknown as WebSocket;
+}
+
+function sampleBidAcceptedEvent(overrides: Partial<BidAcceptedEvent> = {}): BidAcceptedEvent {
+  return {
+    type: 'bid_accepted',
+    auctionId: 'auction-1',
+    bidId: 'bid-1',
+    amount: 105,
+    currentHighest: 105,
+    userId: 'user-1',
+    timestamp: new Date().toISOString(),
+    ...overrides,
+  };
 }
 
 describe('broadcaster (room management)', () => {
@@ -18,10 +32,11 @@ describe('broadcaster (room management)', () => {
     subscribe(auctionId, a);
     subscribe(auctionId, b);
 
-    broadcast(auctionId, { type: 'bid_accepted', amount: 105 });
+    const event = sampleBidAcceptedEvent({ auctionId });
+    broadcast(auctionId, event);
 
-    expect(a.send).toHaveBeenCalledWith(JSON.stringify({ type: 'bid_accepted', amount: 105 }));
-    expect(b.send).toHaveBeenCalledWith(JSON.stringify({ type: 'bid_accepted', amount: 105 }));
+    expect(a.send).toHaveBeenCalledWith(JSON.stringify(event));
+    expect(b.send).toHaveBeenCalledWith(JSON.stringify(event));
   });
 
   it('never delivers to sockets subscribed to a different auction', () => {
@@ -32,7 +47,7 @@ describe('broadcaster (room management)', () => {
     subscribe(auctionA, socketA);
     subscribe(auctionB, socketB);
 
-    broadcast(auctionA, { type: 'bid_accepted' });
+    broadcast(auctionA, sampleBidAcceptedEvent({ auctionId: auctionA }));
 
     expect(socketA.send).toHaveBeenCalledTimes(1);
     expect(socketB.send).not.toHaveBeenCalled();
@@ -43,7 +58,7 @@ describe('broadcaster (room management)', () => {
     const closedSocket = fakeSocket(3 /* CLOSED, not OPEN(1) */);
     subscribe(auctionId, closedSocket);
 
-    broadcast(auctionId, { type: 'bid_accepted' });
+    broadcast(auctionId, sampleBidAcceptedEvent({ auctionId }));
 
     expect(closedSocket.send).not.toHaveBeenCalled();
   });
@@ -57,11 +72,12 @@ describe('broadcaster (room management)', () => {
     unsubscribeAll(socket);
     expect(roomSize(auctionId)).toBe(0);
 
-    broadcast(auctionId, { type: 'bid_accepted' });
+    broadcast(auctionId, sampleBidAcceptedEvent({ auctionId }));
     expect(socket.send).not.toHaveBeenCalled();
   });
 
   it('does nothing (and does not throw) when broadcasting to an auction with no subscribers', () => {
-    expect(() => broadcast(`nobody-subscribed-${Math.random()}`, { type: 'bid_accepted' })).not.toThrow();
+    const auctionId = `nobody-subscribed-${Math.random()}`;
+    expect(() => broadcast(auctionId, sampleBidAcceptedEvent({ auctionId }))).not.toThrow();
   });
 });

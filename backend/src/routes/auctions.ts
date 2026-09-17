@@ -62,8 +62,9 @@ auctionsRouter.post(
       auctionId,
       bidId: result.bidId,
       amount: result.amount,
+      currentHighest: result.amount,
       userId,
-      at: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     });
 
     res.status(201).json(result);

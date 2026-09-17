@@ -1,6 +1,7 @@
 import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { subscribe, unsubscribeAll } from './broadcaster.js';
+import type { ServerEvent } from './messages.js';
 import { getAuctionById } from '../services/getAuction.js';
 import { isUuid } from '../validation.js';
 
@@ -27,8 +28,12 @@ export function attachWebSocketServer(httpServer: Server): WebSocketServer {
   return wss;
 }
 
+function send(socket: WebSocket, event: ServerEvent): void {
+  socket.send(JSON.stringify(event));
+}
+
 function sendError(socket: WebSocket, message: string): void {
-  socket.send(JSON.stringify({ type: 'error', message }));
+  send(socket, { type: 'error', message });
 }
 
 async function handleMessage(socket: WebSocket, raw: Buffer): Promise<void> {
@@ -63,5 +68,5 @@ async function handleMessage(socket: WebSocket, raw: Buffer): Promise<void> {
   }
 
   subscribe(auctionId, socket);
-  socket.send(JSON.stringify({ type: 'snapshot', auction }));
+  send(socket, { type: 'snapshot', auction });
 }

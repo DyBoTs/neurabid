@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>NeuraBid — realtime debug harness (not product UI)</title>
+<style>
+  body { font: 14px/1.4 monospace; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 16px; }
+  .status { font-weight: bold; padding: 2px 8px; border-radius: 3px; display: inline-block; }
+  .status-connecting { background: #fff3cd; }
+  .status-open { background: #d4edda; }
+  .status-reconnecting { background: #fff3cd; }
+  .status-closed { background: #f8d7da; }
+  #log { background: #111; color: #0f0; padding: 8px; height: 220px; overflow-y: auto; white-space: pre-wrap; }
+  input, select, button { font: inherit; padding: 4px 6px; }
+  .price { font-size: 28px; font-weight: bold; }
+  section { margin-bottom: 1.5rem; border: 1px solid #ccc; padding: 0.75rem; }
+</style>
+</head>
+<body>
+<h1>NeuraBid realtime debug harness</h1>
+<p><em>This is a manual test tool for verifying the WebSocket layer, not the product UI (see docs/05-realtime.md). Open this page in two browser windows to watch bids sync live.</em></p>
+
+<section>
+  <div>Connection: <span id="status" class="status status-connecting">connecting…</span></div>
+</section>
+
+<section>
+  <label>Username: <input id="username" value="tester" /></label>
+  <button id="loginBtn">Create / use this user</button>
+  <div>User id: <code id="userId">(none yet)</code></div>
+</section>
+
+<section>
+  <label>Auction:
+    <select id="auctionSelect"></select>
+  </label>
+  <button id="refreshAuctions">Refresh list</button>
+</section>
+
+<section>
+  <div>Current price: <span id="price" class="price">—</span></div>
+  <div>Status: <span id="auctionStatus">—</span></div>
+  <label>Bid amount: <input id="bidAmount" type="number" /></label>
+  <button id="bidBtn">Place bid</button>
+  <div id="bidResult"></div>
+</section>
+
+<section>
+  <div>Event log:</div>
+  <div id="log"></div>
+</section>
+
+<script>
+let ws = null;
+let currentAuctionId = null;
+let userId = null;
+let reconnectAttempt = 0;
+
+function log(line) {
+  const el = document.getElementById('log');
+  el.textContent += `[${new Date().toISOString()}] ${line}\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status status-' + cls;
+}
+
+function connect() {
+  setStatus(reconnectAttempt > 0 ? `reconnecting (attempt ${reconnectAttempt})…` : 'connecting…', 'connecting');
+  ws = new WebSocket(`ws://${location.host}`);
+
+  ws.onopen = () => {
+    reconnectAttempt = 0;
+    setStatus('open', 'open');
+    log('WebSocket open');
+    if (currentAuctionId) subscribe(currentAuctionId);
+  };
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    log('recv: ' + JSON.stringify(msg));
+    if (msg.type === 'snapshot' || msg.type === 'bid_accepted') {
+      // For bid_accepted we only know the new price/highest, not the full
+      // auction row, but for this debug page re-fetching on any update is
+      // fine — clarity over cleverness here.
+      refreshAuctionDetail();
+    }
+    if (msg.type === 'auction_ended') {
+      document.getElementById('auctionStatus').textContent = 'ended';
+    }
+  };
+
+  ws.onclose = () => {
+    setStatus('closed — reconnecting shortly', 'closed');
+    log('WebSocket closed, will reconnect');
+    reconnectAttempt += 1;
+    const delay = Math.min(5000, 500 * 2 ** reconnectAttempt);
+    setTimeout(connect, delay);
+  };
+
+  ws.onerror = () => {
+    log('WebSocket error');
+  };
+}
+
+function subscribe(auctionId) {
+  currentAuctionId = auctionId;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'subscribe', auctionId }));
+    log('sent subscribe for ' + auctionId);
+  }
+}
+
+async function refreshAuctionDetail() {
+  if (!currentAuctionId) return;
+  const res = await fetch(`/api/auctions/${currentAuctionId}`);
+  const auction = await res.json();
+  document.getElementById('price').textContent = auction.currentPrice;
+  document.getElementById('auctionStatus').textContent = auction.status;
+}
+
+async function refreshAuctionList() {
+  const res = await fetch('/api/auctions');
+  const auctions = await res.json();
+  const select = document.getElementById('auctionSelect');
+  const previous = select.value;
+  select.innerHTML = '';
+  for (const a of auctions) {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = `${a.title} (${a.status}, $${a.currentPrice})`;
+    select.appendChild(opt);
+  }
+  if (auctions.some((a) => a.id === previous)) select.value = previous;
+  else if (auctions[0]) {
+    select.value = auctions[0].id;
+    subscribe(auctions[0].id);
+    refreshAuctionDetail();
+  }
+}
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const username = document.getElementById('username').value.trim();
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+  const user = await res.json();
+  if (!res.ok) {
+    log('login error: ' + JSON.stringify(user));
+    return;
+  }
+  userId = user.id;
+  document.getElementById('userId').textContent = userId;
+  log('logged in as ' + username + ' (' + userId + ')');
+});
+
+document.getElementById('auctionSelect').addEventListener('change', (e) => {
+  subscribe(e.target.value);
+  refreshAuctionDetail();
+});
+
+document.getElementById('refreshAuctions').addEventListener('click', refreshAuctionList);
+
+document.getElementById('bidBtn').addEventListener('click', async () => {
+  const resultEl = document.getElementById('bidResult');
+  if (!userId) {
+    resultEl.textContent = 'Create a user first.';
+    return;
+  }
+  if (!currentAuctionId) {
+    resultEl.textContent = 'Pick an auction first.';
+    return;
+  }
+  const amount = Number(document.getElementById('bidAmount').value);
+  const res = await fetch(`/api/auctions/${currentAuctionId}/bids`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+    body: JSON.stringify({ amount }),
+  });
+  const body = await res.json();
+  resultEl.textContent = res.ok
+    ? `Accepted: bid ${body.bidId} for ${body.amount}`
+    : `Rejected (${res.status}): ${body.error}`;
+  log('bid attempt -> ' + res.status + ' ' + JSON.stringify(body));
+});
+
+refreshAuctionList();
+connect();
+</script>
+</body>
+</html>

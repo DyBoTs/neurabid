@@ -1,4 +1,5 @@
 import type { WebSocket } from 'ws';
+import type { ServerEvent } from './messages.js';
 
 /**
  * A "room" per auction id — the set of sockets currently subscribed to
@@ -36,7 +37,7 @@ export function unsubscribeAll(socket: WebSocket): void {
  * only occurs post-COMMIT) — this function has no way to enforce that
  * itself, so it never should be called speculatively.
  */
-export function broadcast(auctionId: string, message: unknown): void {
+export function broadcast(auctionId: string, message: ServerEvent): void {
   const room = rooms.get(auctionId);
   if (!room || room.size === 0) return;
 

@@ -1,5 +1,7 @@
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { pool } from './db.js';
 import { ensureRedisConnected, redis } from './redis.js';
@@ -9,8 +11,15 @@ import { auctionsRouter } from './routes/auctions.js';
 import { attachWebSocketServer } from './ws/wsServer.js';
 import { startAuctionEndSweep } from './services/auctionEndSweep.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export const app = express();
 app.use(express.json());
+
+// A plain manual-test page for verifying the WebSocket layer with real
+// browsers (see docs/05-realtime.md) — NOT the product UI. Lives at
+// /debug/realtime-test.html.
+app.use('/debug', express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', async (_req, res) => {
   const checks: Record<string, 'ok' | 'error'> = { db: 'error', redis: 'error' };
