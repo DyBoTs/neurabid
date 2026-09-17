@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { placeBid } from '../src/services/placeBid.js';
 import { pool } from '../src/db.js';
 import { createTestAuction, createTestUser } from './helpers.js';
+import { checkAuctionInvariants } from './invariants.js';
 
 /**
  * These tests prove the core hackathon claim: under concurrent bidding,
@@ -37,6 +38,8 @@ describe('placeBid concurrency correctness', () => {
       auctionId,
     ]);
     expect(Number(rows[0].current_price)).toBe(105);
+
+    await checkAuctionInvariants(auctionId);
   });
 
   it('under many concurrent escalating bids, the database ends up exactly consistent', async () => {
@@ -105,5 +108,7 @@ describe('placeBid concurrency correctness', () => {
 
     expect(accepted.length + rejected.length).toBe(bidderCount);
     expect(accepted.length).toBeGreaterThan(0);
+
+    await checkAuctionInvariants(auctionId);
   });
 });

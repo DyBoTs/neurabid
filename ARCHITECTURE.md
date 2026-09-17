@@ -69,3 +69,7 @@ Three gaps got closed after the initial Phase 1 pass, all documented in full (wi
 **Verified live, not just in tests:** with the backend actually running, `curl` was used to create a user, list auctions, fetch one, place a valid bid, attempt a too-low bid (409), attempt a bid with no `X-User-Id` (400), attempt a bid on a nonexistent auction (404), and attempt a bid on the seeded "not started yet" auction (403) — every response matched what the automated tests already claimed, confirming the tests reflect real HTTP behavior and not just in-process assumptions.
 
 **Not built yet:** no WebSocket layer — placing a bid via the API works, but nothing pushes the new price to other connected clients. That's Phase 3.
+
+## Concurrency Testing Deep-Dive
+
+`backend/test/concurrencyProof.test.ts` and the shared invariant checker (`backend/test/invariants.ts`) get their own full write-up in **`docs/04-concurrency-testing.md`** — scenario-by-scenario explanations, what each invariant check actually verifies against the raw database, and real (not fabricated) output from 5 consecutive full test-suite runs, included specifically to show the accept/reject counts genuinely vary between runs while every correctness invariant holds every time. That file is the canonical reference for "how do we know this is actually safe under concurrency" — this note is just a pointer to it.
